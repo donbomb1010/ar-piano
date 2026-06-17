@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, Settings2, Maximize2, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useHandTracking } from '../hooks/useHandTracking';
@@ -64,7 +64,6 @@ const PIANO_KEYS = generatePianoKeys();
 const FINGERTIPS = [4, 8, 12, 16, 20];
 
 // Hysteresis Thresholds
-const ZONE_START_Y = 0.65; // Visual top of piano
 const PRESS_THRESHOLD = 0.70; // Must cross this downward to play
 const RELEASE_THRESHOLD = 0.60; // Must cross this upward to reset
 const BLACK_KEY_BOTTOM = 0.85; // Y < 0.85 means black key can be pressed
@@ -81,7 +80,7 @@ export default function AirPiano() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(0);
   
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [fps, setFps] = useState(0);
@@ -93,7 +92,7 @@ export default function AirPiano() {
   const lastTimeRef = useRef(performance.now());
   const fingerStates = useRef<Map<string, boolean>>(new Map()); // true = currently pressed
   
-  const { isLoaded, error, detectHands } = useHandTracking();
+  const { isLoaded, detectHands } = useHandTracking();
 
   useEffect(() => {
     async function setupCamera() {
