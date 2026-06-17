@@ -166,7 +166,15 @@ export default function AirPiano() {
       }
 
       const now = performance.now();
-      const results = detectHands(video, now);
+      let results: any = null;
+      try {
+        results = detectHands(video, now);
+      } catch (err) {
+        console.error("AI Detection paused during camera switch:", err);
+        // Continue the animation loop even if it fails for a frame
+        requestRef.current = requestAnimationFrame(processVideo);
+        return;
+      }
       
       fpsRef.current++;
       if (now - lastTimeRef.current >= 1000) {
