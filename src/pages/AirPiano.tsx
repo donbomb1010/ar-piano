@@ -200,7 +200,7 @@ export default function AirPiano() {
       if (results && results.landmarks) {
         drawHandLandmarks(ctx, results, canvas.width, canvas.height);
 
-        results.landmarks.forEach((hand, handIndex) => {
+        results.landmarks.forEach((hand: any, handIndex: number) => {
           FINGERTIPS.forEach((tipIndex) => {
             const landmark = hand[tipIndex];
             // Fix: Front camera is CSS-mirrored, so we invert X. Back camera is not mirrored, so we use raw X.
