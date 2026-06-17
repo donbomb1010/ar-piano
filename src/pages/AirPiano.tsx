@@ -64,9 +64,9 @@ const PIANO_KEYS = generatePianoKeys();
 const FINGERTIPS = [4, 8, 12, 16, 20];
 
 // Hysteresis Thresholds
-const PRESS_THRESHOLD = 0.70; // Must cross this downward to play
-const RELEASE_THRESHOLD = 0.60; // Must cross this upward to reset
-const BLACK_KEY_BOTTOM = 0.85; // Y < 0.85 means black key can be pressed
+const PRESS_THRESHOLD = 0.55; // Must cross this downward to play
+const RELEASE_THRESHOLD = 0.45; // Must cross this upward to reset
+const BLACK_KEY_BOTTOM = 0.75; // Y < 0.75 means black key can be pressed
 
 function setsAreEqual(a: Set<string>, b: Set<string>) {
   if (a.size !== b.size) return false;
@@ -195,9 +195,8 @@ export default function AirPiano() {
         results.landmarks.forEach((hand, handIndex) => {
           FINGERTIPS.forEach((tipIndex) => {
             const landmark = hand[tipIndex];
-            // If user facing (front camera), MediaPipe already naturally flips it. 
-            // If environment (back camera), we usually don't want to mirror. But for consistency, let's keep the X mapping relative to the visual canvas.
-            const x = 1.0 - landmark.x; // Mirror X
+            // Fix: Front camera is CSS-mirrored, so we invert X. Back camera is not mirrored, so we use raw X.
+            const x = facingMode === 'user' ? 1.0 - landmark.x : landmark.x;
             const y = landmark.y;
             
             const fingerId = `${handIndex}-${tipIndex}`;
@@ -288,13 +287,13 @@ export default function AirPiano() {
 
       <video
         ref={videoRef}
-        className={`absolute inset-0 w-full h-full object-cover opacity-60 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+        className={`absolute inset-0 w-full h-full object-fill opacity-60 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         playsInline
         muted
       />
       <canvas
         ref={canvasRef}
-        className={`absolute inset-0 w-full h-full object-cover z-10 pointer-events-none ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+        className={`absolute inset-0 w-full h-full object-fill z-10 pointer-events-none ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
       />
 
       <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20 pointer-events-none">
@@ -319,7 +318,7 @@ export default function AirPiano() {
       </div>
 
       {!isPlaying && isLoaded && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 text-center">
+        <div className="absolute top-[25%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 text-center">
           <motion.button 
             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             onClick={handleStartPlaying}
@@ -331,7 +330,7 @@ export default function AirPiano() {
       )}
 
       {/* Piano Overlay */}
-      <div className="absolute top-[65%] bottom-0 left-0 right-0 pointer-events-none">
+      <div className="absolute top-[50%] bottom-0 left-0 right-0 pointer-events-none">
         {/* White Keys */}
         <div className="absolute inset-0 flex bg-white/10 border-t-2 border-electric-blue/50">
           {PIANO_KEYS.filter(k => !k.isBlack).map(key => (
