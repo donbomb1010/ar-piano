@@ -94,14 +94,29 @@ export default function AirPiano() {
   
   const { isLoaded, detectHands } = useHandTracking();
 
+  // Orientation and Camera States
+  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+
+  // Handle Orientation
   useEffect(() => {
+    const handleResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Camera Setup
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let isMounted = true;
+
     async function setupCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
         
-        if (videoRef.current) {
+        if (videoRef.current && isMounted) {
           videoRef.current.srcObject = stream;
           videoRef.current.onloadedmetadata = () => {
             videoRef.current?.play();
@@ -110,20 +125,24 @@ export default function AirPiano() {
         }
       } catch (err) {
         console.error("Camera access denied or failed:", err);
-        setHasPermission(false);
+        if (isMounted) setHasPermission(false);
       }
     }
 
     setupCamera();
 
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
+      isMounted = false;
+      if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, []);
+  }, [facingMode]);
+
+  const toggleCamera = () => {
+    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+  };
 
   const handleStartPlaying = async () => {
     await audio.start();
@@ -176,6 +195,8 @@ export default function AirPiano() {
         results.landmarks.forEach((hand, handIndex) => {
           FINGERTIPS.forEach((tipIndex) => {
             const landmark = hand[tipIndex];
+            // If user facing (front camera), MediaPipe already naturally flips it. 
+            // If environment (back camera), we usually don't want to mirror. But for consistency, let's keep the X mapping relative to the visual canvas.
             const x = 1.0 - landmark.x; // Mirror X
             const y = landmark.y;
             
@@ -227,13 +248,13 @@ export default function AirPiano() {
   }, [isLoaded, detectHands, isPlaying]);
 
   useEffect(() => {
-    if (isLoaded && hasPermission) {
+    if (isLoaded && hasPermission && !isPortrait) {
       requestRef.current = requestAnimationFrame(processVideo);
     }
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [isLoaded, hasPermission, processVideo]);
+  }, [isLoaded, hasPermission, processVideo, isPortrait]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement && containerRef.current) {
@@ -255,15 +276,25 @@ export default function AirPiano() {
 
   return (
     <div ref={containerRef} className="flex-1 bg-black relative overflow-hidden flex flex-col">
+      {isPortrait && (
+        <div className="absolute inset-0 z-[100] bg-black flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-electric-blue/20 rounded-full flex items-center justify-center mb-6">
+            <Camera className="w-10 h-10 text-electric-blue animate-pulse" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4 text-white">Please Rotate Your Device</h2>
+          <p className="text-gray-400 max-w-sm">Air Piano works best in Landscape Mode so all 36 keys can fit on your screen.</p>
+        </div>
+      )}
+
       <video
         ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover opacity-60 scale-x-[-1]"
+        className={`absolute inset-0 w-full h-full object-cover opacity-60 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         playsInline
         muted
       />
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none scale-x-[-1]"
+        className={`absolute inset-0 w-full h-full object-cover z-10 pointer-events-none ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
       />
 
       <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20 pointer-events-none">
@@ -275,8 +306,15 @@ export default function AirPiano() {
           {isLoaded && <span className="text-xs text-gray-300 ml-2">FPS: {fps}</span>}
         </div>
         <div className="flex gap-2 pointer-events-auto">
-          <button onClick={toggleFullscreen} className="w-10 h-10 rounded-full glass-panel flex items-center justify-center hover:bg-white/10"><Maximize2 className="w-5 h-5 text-white" /></button>
-          <button className="w-10 h-10 rounded-full glass-panel flex items-center justify-center hover:bg-white/10"><Settings2 className="w-5 h-5 text-white" /></button>
+          <button onClick={toggleCamera} className="w-10 h-10 rounded-full glass-panel flex items-center justify-center hover:bg-white/10" title="Flip Camera">
+            <Camera className="w-5 h-5 text-white" />
+          </button>
+          <button onClick={toggleFullscreen} className="w-10 h-10 rounded-full glass-panel flex items-center justify-center hover:bg-white/10" title="Fullscreen">
+            <Maximize2 className="w-5 h-5 text-white" />
+          </button>
+          <button className="w-10 h-10 rounded-full glass-panel flex items-center justify-center hover:bg-white/10" title="Settings">
+            <Settings2 className="w-5 h-5 text-white" />
+          </button>
         </div>
       </div>
 
